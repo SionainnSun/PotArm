@@ -14,6 +14,7 @@ public class DisableCargoArmPIDCommand extends Command {
   public DisableCargoArmPIDCommand() {
     // Use requires() here to declare subsystem dependencies
     // eg. requires(chassis);
+    requires(Robot.cargoArmSubsystem);
   }
 
   // Called just before this Command runs the first time

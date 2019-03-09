@@ -11,11 +11,7 @@ import frc.robot.OI;
 import frc.robot.RobotMap;
 
 import edu.wpi.first.wpilibj.command.PIDSubsystem;
-import edu.wpi.first.wpilibj.interfaces.Potentiometer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.wpilibj.AnalogPotentiometer;
-import edu.wpi.first.wpilibj.DigitalInput;
-
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.FeedbackDevice;
 import com.ctre.phoenix.motorcontrol.LimitSwitchNormal;
@@ -29,30 +25,50 @@ public class CargoPIDSubsystem extends PIDSubsystem {
   
   private WPI_TalonSRX cargoArm = null;
   
-  public static double lastManualPos = 0;
+  public static double lastManualPos = 95;
 
-  static double[][] powerTable = {
+  /**
+   * poitive = toward bumper
+   */
+  static double[][] manualPowerTable = {
+    //pot position, max power going towards hatch, max power going towards bumper
     {0, 0.0, 0.3},
     {210, 0.25, 0.15},
-    {340, 0.3, 0.0},
-    {900, 0.0, 0.0},
+    {310, 0.3, 0.0},
     {10000, 0.0, 0.0}
   };
+
+  static double[][] PIDPowerTable = {
+    {0, 0.0, 0.4},
+    {210, 0.25, 0.15},
+    {260, 0.25, 0.15},
+    {310, 0.4, 0.0},
+    {10000, 0.0, 0.0}
+  };
+
+  static double kP = 0.015;
+  static double kI = 0.0001;
+  static double kD = 0.001;
 
   /**
    * Add your docs here.
    */
   public CargoPIDSubsystem() {
     // Intert a subsystem name and PID values here
-    super("Cargo Arm", 0.01, 0, 0);
+    
+    super("Cargo Arm", kP, kI, kD);
+    SmartDashboard.putNumber("kP", kP);
+    SmartDashboard.putNumber("kI", kI);
+    SmartDashboard.putNumber("kD", kD);
+
     cargoArm = new WPI_TalonSRX(1);
     cargoArm.configSelectedFeedbackSensor(FeedbackDevice.Analog, 0, 30);
     cargoArm.configForwardLimitSwitchSource(LimitSwitchSource.FeedbackConnector, LimitSwitchNormal.NormallyOpen);
     cargoArm.configReverseLimitSwitchSource(LimitSwitchSource.FeedbackConnector, LimitSwitchNormal.NormallyOpen);
     
     //empirically derived -- is it straight amps or a percentage???
-    cargoArm.configPeakCurrentLimit(18, 30);
-    cargoArm.configContinuousCurrentLimit(15, 30);
+    // cargoArm.configPeakCurrentLimit(18, 30);
+    // cargoArm.configContinuousCurrentLimit(15, 30);
 
     setAbsoluteTolerance(5);
     disable();
@@ -66,16 +82,23 @@ public class CargoPIDSubsystem extends PIDSubsystem {
 
   @Override
   protected double returnPIDInput() {
-    return getPosition();
+    double pos = getPosition();
+    int colRef = getPIDError() > 0 ? 2 : 1;
+    double maxPower = getMaxPower(pos, colRef, PIDPowerTable);
+    setOutputRange(-maxPower, maxPower);
+    SmartDashboard.putNumber("Pot Position", pos);
+    SmartDashboard.putNumber("Col Ref", colRef);
+    SmartDashboard.putNumber("Max Power", maxPower);
+    return pos;
+    // return getPosition();
   }
 
   @Override
   protected void usePIDOutput(double output) {
     //green is toward bumper
-    if((output < 0 && getPosition() < 200) || (output > 0 && getPosition() > 400)) {
-      output = 0;
-    }
-
+    SmartDashboard.putNumber("PID Setpoint", getSetpoint());
+    SmartDashboard.putNumber("Pot Position", getPosition());
+    SmartDashboard.putNumber("PID Output", output);
     cargoArm.set(ControlMode.PercentOutput, output);
   }
 
@@ -92,7 +115,7 @@ public class CargoPIDSubsystem extends PIDSubsystem {
   public void manualCargoArm(OI oi) {
     double joyVal = deadzone(oi.getJoystick().getRawAxis(RobotMap.RIGHT_JOYSTICK_Y));
     int colRef = joyVal > 0 ? 1 : 2;
-    double scaleFactor = getMaxPower(cargoArm.getSelectedSensorPosition(), colRef);
+    double scaleFactor = getMaxPower(cargoArm.getSelectedSensorPosition(), colRef, manualPowerTable);
 
     /**
      * negative because the motor and the arm drive in opposite directions
@@ -105,7 +128,7 @@ public class CargoPIDSubsystem extends PIDSubsystem {
 
     lastManualPos = cargoArm.getSelectedSensorPosition();
 
-    SmartDashboard.putNumber("pot position", cargoArm.getSelectedSensorPosition());
+    SmartDashboard.putNumber("Pot Position", cargoArm.getSelectedSensorPosition());
 
     cargoArm.set(ControlMode.PercentOutput, motorOutput);
   }
@@ -114,25 +137,27 @@ public class CargoPIDSubsystem extends PIDSubsystem {
     return Math.abs(val) > 0.05 ? val : 0;
   }
 
-  private double getMaxPower(int potVal, int colRef) {
+  private double getMaxPower(double potVal, int colRef, double[][] powerTable) {
     double maxOutput = 0;
     
-    for(int r = 0; r < 5; r++) {
+    for(int r = 0; r < powerTable.length; r++) {
         try {
           if(inRangeInclusive(potVal, powerTable[r][0], powerTable[r+1][0])) {
             maxOutput = powerTable[r][colRef];
             return maxOutput;
           }
         } catch(ArrayIndexOutOfBoundsException e) {
-          // maxOutput = powerTable[r][colRef];
-          maxOutput = 3000;
+          maxOutput = powerTable[r][colRef];
         }
       }
     return maxOutput;
   }
 
-  private boolean inRangeInclusive(int val, double min, double max) {
+  private boolean inRangeInclusive(double val, double min, double max) {
     return val >= min && val <= max;
   }
 
+  private double getPIDError() {
+    return getSetpoint() - getPosition();
+  }
 }

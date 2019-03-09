@@ -14,6 +14,7 @@ public class DriveCargoArmWithJoystickCommand extends Command {
   public DriveCargoArmWithJoystickCommand() {
     // Use requires() here to declare subsystem dependencies
     // eg. requires(chassis);
+    requires(Robot.cargoArmSubsystem);
   }
 
   // Called just before this Command runs the first time

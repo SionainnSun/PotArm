@@ -33,9 +33,10 @@ public class OI {
 		JoystickButton leftJoy = new JoystickButton(joystick, 9);
 		leftJoy.whenActive(new EnableManualCargoArmControlCommandGroup());
 
-		a.whenPressed(new ChangeCargoArmSetpointCommand(150));
-		b.whenPressed(new ChangeCargoArmSetpointCommand(250));
-		x.whenPressed(new ChangeCargoArmSetpointCommand(300));
+		a.whenPressed(new ChangeCargoArmSetpointCommand(90));
+		b.whenPressed(new ChangeCargoArmSetpointCommand(185));
+		y.whenPressed(new ChangeCargoArmSetpointCommand(350));
+		x.whenPressed(new ChangeCargoArmSetpointCommand(500));
 	}
 
 	public Joystick getJoystick() {
